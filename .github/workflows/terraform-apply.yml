@@ -1,0 +1,145 @@
+# Terraform Applyを実行するためのymlファイルです
+# `< Organization Name >` 部分は適切な Organization Name に置き換えてください。
+# `< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >`部分は適切なリポジトリ名に置き換えてください。
+# `secrets.~`部分はそれぞれ適切な Secret key に置き換えてください。
+
+name: terraform-apply
+on:
+  pull_request:
+    branches:
+      - main
+    types: [labeled]
+    paths:
+      - .github/workflows/terraform-apply.yml
+      - 'modules/*/main.tf'
+      - 'Makefile'
+      - '*.tf'
+      - '*.tfvars'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform_apply:
+    name: Execute terraform apply
+    runs-on: ubuntu-latest
+    if: ${{ github.event.label.name == 'trigger-terraform-apply' }}
+    permissions: write-all
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Get Terraform version
+        id: check
+        run: echo "version=$(cat .terraform-version)" >> ${GITHUB_OUTPUT}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.check.outputs.version }}
+
+      - name: Initialize Terraform environment
+        run: |
+          make prepare GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Apply用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Apply用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+
+      - name: Setup tfcmt
+        uses: shmokmt/actions-setup-tfcmt@v2
+        with:
+          version: v4.8.0
+
+      - name: Generate token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.< Terraform Apply用に作成したGitHub AppのAPP IDの値を設定したSecret key > }}
+          private-key: ${{ secrets.< Terraform Apply用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Download Terraform state file
+        id: download_state_file
+        run: |
+          curl -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ steps.generate_token.outputs.token }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -o terraform.tfstate.response \
+              -w "%{http_code}" \
+              https://api.github.com/repos/< Organization Name >/< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >/contents/terraform.tfstate > response_code
+          HTTP_CODE=$(cat response_code)
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+              jq -r '.content' terraform.tfstate.response | base64 --decode | tr -d '\n' > terraform.tfstate
+              echo "sha=$(jq -r '.sha' terraform.tfstate.response)" >> $GITHUB_OUTPUT
+          elif [ "$HTTP_CODE" -eq 404 ]; then
+              echo "File not found, skipping download."
+              echo "sha=initial_apply" >> $GITHUB_OUTPUT
+          else
+              echo "Error: Received HTTP code $HTTP_CODE" >&2
+              exit 1
+          fi
+
+      - name: Create .tfvars files from repo secrets
+        run: |
+          set +x
+          echo "pem_file = <<EOT" > pem.tfvars
+          echo "${{ secrets.< Terraform Apply用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}" >> pem.tfvars
+          echo "EOT" >> pem.tfvars
+          set -x
+
+      - name: Extract working directory from `state_path_local`
+        shell: bash
+        run: |
+            workdir=$(dirname "terraform.tfstate")
+            echo "workdir=$workdir" >> $GITHUB_ENV
+
+      - name: Check if Terraform env is initialized
+        shell: bash
+        run: |
+          if [ ! -d "${{ env.workdir }}/.terraform" ]; then
+              echo "Error: Terraform has not been initialized. Please run 'terraform init' at `${{ env.workdir }}` before this action."
+              exit 1
+          fi
+
+      - name: Execute `terraform apply`
+        shell: bash
+        run: |
+            git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/< Organization Name >".insteadOf "ssh://git@github.com/< Organization Name >"
+            tfcmt --config tfcmt.yaml apply -- make apply-force GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Apply用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Apply用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+        continue-on-error: true  # necessary to upload state file in case of `apply` error
+        env:
+            GITHUB_TOKEN: ${{ github.token }}
+            WRITE_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - name: Upload State File
+        shell: bash
+        run: |
+          if [ -z "${{ steps.download_state_file.outputs.sha }}" ]; then
+            echo "Error: sha input is required for upload action" >&2
+            exit 1
+          fi
+          base64 terraform.tfstate | tr -d '\n' > content.b64
+          jq -n --rawfile content content.b64 \
+            --arg msg "Update state file" \
+            --arg name "github-actions[bot]" \
+            --arg email "github-actions[bot]@users.noreply.github.com" \
+            --arg sha "${{ steps.download_state_file.outputs.sha }}" \
+            '{
+              message: $msg,
+              committer: {name: $name, email: $email},
+              content: $content
+            } + (if $sha != "initial_apply" then {sha: $sha} else {} end)' > payload.json
+          curl -L \
+            -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ steps.generate_token.outputs.token }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/< Organization Name >/< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >/contents/terraform.tfstate \
+            -d @"payload.json"

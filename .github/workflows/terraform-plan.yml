@@ -1,0 +1,94 @@
+# Terraform Planを実行するためのymlファイルです
+# `< Organization Name >` 部分は適切な Organization Name に置き換えてください。
+# `< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >`部分は適切なリポジトリ名に置き換えてください。
+# `secrets.~`部分はそれぞれ適切な Secret key に置き換えてください。
+name: terraform-plan
+on:
+  pull_request:
+    paths:
+      - .github/workflows/terraform-plan.yml
+      - 'modules/*/main.tf'
+      - 'Makefile'
+      - '*.tf'
+      - '*.tfvars'
+
+jobs:
+  terraform_plan:
+    name: Execute terraform plan
+    runs-on: ubuntu-latest
+    permissions: write-all
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Get Terraform version
+        id: check
+        run: echo "version=$(cat .terraform-version)" >> $GITHUB_OUTPUT
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.check.outputs.version }}
+
+      - name: Setup tfcmt
+        uses: shmokmt/actions-setup-tfcmt@v2
+        with:
+          version: v4.8.0
+
+      - name: Generate token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }}
+          private-key: ${{ secrets.< Terraform Apply用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Initialize Terraform environment
+        run: |
+          make prepare GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+
+      - name: Download Terraform state file
+        id: download_state_file
+        run: |
+          curl -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ steps.generate_token.outputs.token }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -o terraform.tfstate.response \
+              -w "%{http_code}" \
+              https://api.github.com/repos/< Organization Name >/< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >/contents/terraform.tfstate > response_code
+          HTTP_CODE=$(cat response_code)
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+              jq -r '.content' terraform.tfstate.response | base64 --decode | tr -d '\n' > terraform.tfstate
+              echo "sha=$(jq -r '.sha' terraform.tfstate.response)" >> $GITHUB_OUTPUT
+          elif [ "$HTTP_CODE" -eq 404 ]; then
+              echo "File not found, skipping download."
+              echo "sha=initial_apply" >> $GITHUB_OUTPUT
+          else
+              echo "Error: Received HTTP code $HTTP_CODE" >&2
+              exit 1
+          fi
+
+      - name: Create .tfvars files from repo secrets
+        run: |
+          set +x
+          echo "pem_file = <<EOT" > pem.tfvars
+          echo "${{ secrets.< Terraform Plan用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}" >> pem.tfvars
+          echo "EOT" >> pem.tfvars
+          set -x
+
+      - name: Terraform Plan
+        id: terraform_plan
+        run: |
+          git config --global url."https://x-access-token:${READ_REPO_TOKEN}@github.com/< Organization Name >".insteadOf "ssh://git@github.com/< Organization Name >"
+          tfcmt --config tfcmt.yaml plan -- make plan GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          READ_REPO_TOKEN: ${{ steps.generate_token.outputs.token }}

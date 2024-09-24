@@ -1,0 +1,60 @@
+# Terraform Fmt と Terraform Lint を実行するための yml ファイルです
+# `< Organization Name >` 部分は適切な Organization Name に置き換えてください。
+name: terraform-all-test
+on:
+  pull_request:
+    paths:
+      - .github/workflows/terraform-all-test.yml
+      - 'Makefile'
+      - './*.tf'
+      - './*.tfvars'
+      - './*.hcl'
+      - 'tfcmt.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform:
+    name: terraform all test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Tfsec
+        uses: aquasecurity/tfsec-pr-commenter-action@v1.3.1
+        with:
+          github_token: ${{ github.token }}
+          tfsec_args: --ignore-hcl-errors
+
+      - name: Get Terraform version
+        id: check
+        run: echo "version=$(cat .terraform-version)" >> $GITHUB_OUTPUT
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.check.outputs.version }}
+
+      - name: Setup tflint
+        run: |
+          curl -sLo /tmp/tflint.zip https://github.com/terraform-linters/tflint/releases/download/$TFLINT_VERSION/tflint_linux_amd64.zip
+          unzip -o /tmp/tflint.zip -d ./bin
+          $PWD/bin/tflint --init
+        env:
+          TFLINT_VERSION: v0.41.0
+
+      - name: Terraform Format
+        run: make format-check
+
+      - name: Terraform Lint
+        run: |
+          git config --global url."https://x-access-token:${READ_REPO_TOKEN}@github.com/< Organization Name >".insteadOf "ssh://git@github.com/< Organization Name >"
+          make lint TFLINT=$PWD/bin/tflint
