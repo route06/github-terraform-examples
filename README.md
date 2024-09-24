@@ -1,2 +1,3 @@
 # github-terraform-examples
-For managing GitHub organization using Terraform.
+
+< 記事を公開したら記事のリンクを貼り付ける >のサンプルコードです。
