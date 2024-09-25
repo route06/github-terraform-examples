@@ -45,13 +45,13 @@ jobs:
         id: generate_token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }}
-          private-key: ${{ secrets.< Terraform Apply用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}
+          app-id: ${{ secrets.APP_ID_TEST_GH_TFEX }}
+          private-key: ${{ secrets.PRIVATE_KEY_TEST_GH_TFEX }}
           owner: ${{ github.repository_owner }}
 
       - name: Initialize Terraform environment
         run: |
-          make prepare GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+          make prepare GITHUB_ACTIONS=true APP_ID=${{ secrets.APP_ID_TEST_GH_TFEX }} APP_INSTALLATION_ID=${{ secrets.INSRALLATION_ID_TEST_GH_TFEX }}
 
       - name: Download Terraform state file
         id: download_state_file
@@ -62,7 +62,7 @@ jobs:
               -H "X-GitHub-Api-Version: 2022-11-28" \
               -o terraform.tfstate.response \
               -w "%{http_code}" \
-              https://api.github.com/repos/< Organization Name >/< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >/contents/terraform.tfstate > response_code
+              https://api.github.com/repos/route06/terraform-state-files/contents/terraform.tfstate > response_code
           HTTP_CODE=$(cat response_code)
 
           if [ "$HTTP_CODE" -eq 200 ]; then
@@ -80,15 +80,15 @@ jobs:
         run: |
           set +x
           echo "pem_file = <<EOT" > pem.tfvars
-          echo "${{ secrets.< Terraform Plan用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}" >> pem.tfvars
+          echo "${{ secrets.PRIVATE_KEY_TEST_GH_TFEX }}" >> pem.tfvars
           echo "EOT" >> pem.tfvars
           set -x
 
       - name: Terraform Plan
         id: terraform_plan
         run: |
-          git config --global url."https://x-access-token:${READ_REPO_TOKEN}@github.com/< Organization Name >".insteadOf "ssh://git@github.com/< Organization Name >"
-          tfcmt --config tfcmt.yaml plan -- make plan GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+          git config --global url."https://x-access-token:${READ_REPO_TOKEN}@github.com/route06".insteadOf "ssh://git@github.com/route06"
+          tfcmt --config tfcmt.yaml plan -- make plan GITHUB_ACTIONS=true APP_ID=${{ secrets.APP_ID_TEST_GH_TFEX }} APP_INSTALLATION_ID=${{ secrets.INSRALLATION_ID_TEST_GH_TFEX }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           READ_REPO_TOKEN: ${{ steps.generate_token.outputs.token }}
