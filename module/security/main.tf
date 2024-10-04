@@ -8,7 +8,7 @@ terraform {
 }
 
 # ユーザー情報のチェック
-## 変数として渡された全てのユーザーの GitHub Name と GitHub id（ GitHub 登録時に発行される変更不能な整数）の組が意図したものである時のみ Organization に追加する
+## 変数として渡された全てのユーザーの GitHub Username と GitHub id（ GitHub 登録時に発行される変更不能な整数）の組が意図したものである時のみ Organization に追加する
 locals {
   users_map = { for user in var.users_defined : user.username => user }
   users_with_unexpected_id = [
