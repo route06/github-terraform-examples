@@ -5,7 +5,7 @@ terraform {
   required_providers {
     github = {
       source  = "integrations/github"
-      version = "~> 5.36"
+      version = "~> 6.3"
     }
   }
 
@@ -25,7 +25,7 @@ provider "github" {
 
 locals {
   users_usernames     = [for user in var.users : user.username]                # user.tfvars から username を取得
-  org_owner_usernames = setintersection(local.users_usernames, var.org_owners) # Organization owner のユーザー名
+  org_owner_usernames = setintersection(local.users_usernames, var.org_owners) # Organization owner の username
 }
 
 # Organization owner
@@ -108,9 +108,9 @@ resource "github_repository" "terraform_state_files" {
   }
 }
 
-# ユーザーの GitHun Name と GitHub ID のチェック
+# ユーザーの GitHub Username と GitHub ID のチェック
 module "security" {
-  source = "./modules/security"
+  source = "./module/security"
 
   users_defined = var.users
 }
