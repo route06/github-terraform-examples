@@ -11,7 +11,7 @@ on:
     types: [labeled]
     paths:
       - .github/workflows/terraform-apply.yml
-      - 'modules/*/main.tf'
+      - 'module/**'
       - 'Makefile'
       - '*.tf'
       - '*.tfvars'

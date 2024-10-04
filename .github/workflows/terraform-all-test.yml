@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/terraform-all-test.yml
       - 'Makefile'
+      - 'module/**'
       - './*.tf'
       - './*.tfvars'
       - './*.hcl'
