@@ -123,7 +123,7 @@ variable "pem_content" {
   type        = string
 }
 
-# Users.tfvars の Organization owner 情報
+# Organization owner として任命するユーザー名を受け取るための変数
 variable "org_owners" {
   description = "List of users to assign the 'owner' role for the organization"
   type        = list(string)
