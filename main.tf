@@ -19,7 +19,7 @@ terraform {
 provider "github" {
   owner = "< Organization Name >"
   app_auth {
-    pem_file = var.pem_file
+    pem_file = var.pem_content
   }
 }
 
@@ -118,7 +118,7 @@ module "security" {
 
 # tfstate ファイル
 ## Terraform が管理しているリソースの現在の状態を記録したファイル
-variable "pem_file" {
+variable "pem_content" {
   description = "The content of the PEM file"
   type        = string
 }
