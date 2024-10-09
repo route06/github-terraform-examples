@@ -1,7 +1,7 @@
 # Terraform Planを実行するためのymlファイルです
 # `< Organization Name >` 部分は適切な Organization Name に置き換えてください。
 # `< tfstateファイルを管理するリポジトリの作成（ terraform-state-files ） >`部分は適切なリポジトリ名に置き換えてください。
-# `secrets.~`部分はそれぞれ適切な Secret key に置き換えてください。
+# `secrets.~`と`variables.〜`部分はそれぞれ適切な Secret key に置き換えてください。
 name: terraform-plan
 on:
   pull_request:
@@ -45,13 +45,13 @@ jobs:
         id: generate_token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }}
+          app-id: ${{ variables.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }}
           private-key: ${{ secrets.< Terraform Apply用に作成したGitHub AppのPRIVATE KEYの値を設定したSecret key > }}
           owner: ${{ github.repository_owner }}
 
       - name: Initialize Terraform environment
         run: |
-          make prepare GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+          make prepare GITHUB_ACTIONS=true APP_ID=${{ variables.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ variables.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
 
       - name: Download Terraform state file
         id: download_state_file
@@ -88,7 +88,7 @@ jobs:
         id: terraform_plan
         run: |
           git config --global url."https://x-access-token:${READ_REPO_TOKEN}@github.com/< Organization Name >".insteadOf "ssh://git@github.com/< Organization Name >"
-          tfcmt --config tfcmt.yaml plan -- make plan GITHUB_ACTIONS=true APP_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ secrets.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
+          tfcmt --config tfcmt.yaml plan -- make plan GITHUB_ACTIONS=true APP_ID=${{ variables.< Terraform Plan用に作成したGitHub AppのAPP IDの値を設定したSecret key > }} APP_INSTALLATION_ID=${{ variables.< Terraform Plan用に作成したGitHub AppのINSTALLATION IDの値を設定したSecret key > }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           READ_REPO_TOKEN: ${{ steps.generate_token.outputs.token }}
