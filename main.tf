@@ -29,6 +29,7 @@ locals {
 }
 
 # Organization owner
+# `depends_on` を設定することで module "security" が実行された後に処理されるようにしています
 resource "github_membership" "org_owner" {
   for_each = toset(local.org_owner_usernames)
 
