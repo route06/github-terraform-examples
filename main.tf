@@ -129,7 +129,7 @@ variable "org_owners" {
   type        = list(string)
 }
 
-# Users.tfvars の全ユーザー情報
+# ユーザー情報を users.tfvars から受け取るための変数
 variable "users" {
   description = "List of users"
   type = list(object({
