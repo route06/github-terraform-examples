@@ -19,7 +19,7 @@ terraform {
 provider "github" {
   owner = "< Organization Name >"
   app_auth {
-    pem_file = var.pem_file
+    pem_file = var.pem_content
   }
 }
 
@@ -29,6 +29,7 @@ locals {
 }
 
 # Organization owner
+# `depends_on` を設定することで module "security" が実行された後に処理されるようにしています
 resource "github_membership" "org_owner" {
   for_each = toset(local.org_owner_usernames)
 
@@ -117,18 +118,18 @@ module "security" {
 
 # tfstate ファイル
 ## Terraform が管理しているリソースの現在の状態を記録したファイル
-variable "pem_file" {
+variable "pem_content" {
   description = "The content of the PEM file"
   type        = string
 }
 
-# Users.tfvars の Organization owner 情報
+# Organization owner として任命するユーザー名を受け取るための変数
 variable "org_owners" {
   description = "List of users to assign the 'owner' role for the organization"
   type        = list(string)
 }
 
-# Users.tfvars の全ユーザー情報
+# ユーザー情報を users.tfvars から受け取るための変数
 variable "users" {
   description = "List of users"
   type = list(object({
