@@ -1,3 +1,3 @@
 # github-terraform-examples
 
-< 記事を公開したら記事のリンクを貼り付ける >のサンプルコードです。
+https://tech.route06.co.jp/entry/2024/10/18/153755 のサンプルコードです。
